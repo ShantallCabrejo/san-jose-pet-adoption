@@ -129,12 +129,10 @@ button {
   background:
     linear-gradient(
       90deg,
-      rgba(0, 20, 30, 0.03) 0%,
-      rgba(0, 40, 49, 0.12) 35%,
-      rgba(0, 65, 73, 0.85) 65%,
-      rgba(0, 62, 72, 0.95) 100%
+      rgba(0, 0, 0, 0.05),
+      rgba(0, 55, 65, 0.85)
     ),
-    url('/images/oreo.jpg') 18% 42% / cover no-repeat;
+    url('/images/hero-pets.png') center / cover no-repeat;
 }
 
 .hero-content {
