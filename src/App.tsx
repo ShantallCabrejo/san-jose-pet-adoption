@@ -154,6 +154,24 @@ function App() {
     localStorage.setItem('pet-favorites', JSON.stringify(favorites))
   }, [favorites])
 
+  useEffect(() => {
+  const url =
+    'https://geo.sanjoseca.gov/server/rest/services/DPW/DPW_AnimalCareServices/MapServer/1/query'
+
+  const params = new URLSearchParams({
+    where: "ANIMALSTATUS='Available'",
+    outFields: 'ANIMALID,PETNAME,ANIMALTYPE,PHOTOLINK',
+    returnGeometry: 'false',
+    resultRecordCount: '3',
+    f: 'json',
+  })
+
+  fetch(`${url}?${params}`)
+    .then((response) => response.json())
+    .then((data) => console.log('Shelter animals:', data.features))
+    .catch((error) => console.error('Shelter API error:', error))
+}, [])
+
   function toggleFavorite(id: string) {
     setFavorites((current) =>
       current.includes(id)
