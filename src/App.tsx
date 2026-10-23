@@ -17,109 +17,43 @@ type Pet = {
   status: string
   species: string
   image: string
+  profileUrl: string
+  rescueStatus: string
+  fosterStatus: string
+}
+
+type ShelterAnimal = {
+  ANIMALID: string | null
+  PETNAME: string | null
+  ANIMALTYPE: string | null
+  ANIMALSUBTYPE: string | null
+  SEX: string | null
+  PETAGE: string | null
+  PETAGEYEARS: number | null
+  PETSIZE: string | null
+  PETWEIGHT: number | string | null
+  COLOR: string | null
+  BREED: string | null
+  KENNELNAME: string | null
+  INDATE: number | null
+  ANIMALSTATUS: string | null
+  RESCUESTATUS: string | null
+  FOSTERSTATUS: string | null
+  PHOTOLINK: string | null
+  WEBLINK: string | null
+}
+
+type ShelterResponse = {
+  features?: { attributes: ShelterAnimal }[]
+  exceededTransferLimit?: boolean
+  error?: { message?: string }
 }
 
 const shelterURL =
   'https://www.sanjoseca.gov/your-government/departments-offices/animal-care-services'
 
-const pets: Pet[] = [
-  {
-    id: 'A1416116',
-    name: 'Oreo',
-    age: '2 years',
-    ageMonths: 24,
-    sex: 'Female (Spayed)',
-    breed: 'Domestic Shorthair',
-    color: 'Black / White',
-    size: 'Medium',
-    weight: '10 lbs',
-    kennel: 'AI02',
-    intake: '10/13/26',
-    status: 'Available',
-    species: 'Cats',
-    image: '/images/oreo.jpg',
-  },
-  {
-    id: 'A1412351',
-    name: 'Whimze',
-    age: '11 weeks',
-    ageMonths: 2.5,
-    sex: 'Female (Spayed)',
-    breed: 'Domestic Shorthair',
-    color: 'Tabby-Brown',
-    size: 'Small',
-    weight: '2 lbs',
-    kennel: 'SD12',
-    intake: '8/7/26',
-    status: 'Available',
-    species: 'Cats',
-    image: '/images/whimze.jpg',
-  },
-  {
-    id: 'A1412292',
-    name: 'Lulu Lily',
-    age: '4 months',
-    ageMonths: 4,
-    sex: 'Female (Spayed)',
-    breed: 'Domestic Shorthair',
-    color: 'Tabby-Brown',
-    size: 'Small',
-    weight: '5 lbs',
-    kennel: 'AF03',
-    intake: '8/6/26',
-    status: 'Available',
-    species: 'Cats',
-    image: '/images/lulu-lily.jpg',
-  },
-  {
-    id: 'A1407878',
-    name: 'Nano',
-    age: '6 months',
-    ageMonths: 6,
-    sex: 'Male (Neutered)',
-    breed: 'Domestic Shorthair',
-    color: 'Black',
-    size: 'Small',
-    weight: '6 lbs',
-    kennel: 'KK01',
-    intake: '5/23/26',
-    status: 'Available',
-    species: 'Cats',
-    image: '/images/nano.jpg',
-  },
-  {
-    id: 'A1415053',
-    name: 'Tilly',
-    age: '1 year, 1 month',
-    ageMonths: 13,
-    sex: 'Female (Spayed)',
-    breed: 'Domestic Shorthair',
-    color: 'Tabby-Brown',
-    size: 'Medium',
-    weight: '6 lbs',
-    kennel: 'AI03',
-    intake: '9/23/26',
-    status: 'Available',
-    species: 'Cats',
-    image: '/images/tilly.jpg',
-  },
-  {
-    id: 'A1413223',
-    name: 'Nemo',
-    age: '10 months',
-    ageMonths: 10,
-    sex: 'Male (Neutered)',
-    breed: 'Domestic Shorthair',
-    color: 'Gray',
-    size: 'Medium',
-    weight: '7 lbs',
-    kennel: 'KM04',
-    intake: '8/24/26',
-    status: 'Available',
-    species: 'Cats',
-    image: '/images/nemo.jpg',
-  },
-]
+const API_URL =
+  'https://geo.sanjoseca.gov/server/rest/services/DPW/DPW_AnimalCareServices/MapServer/1/query'
 
 const categories = [
   { name: 'Dogs', icon: '🐕' },
@@ -129,7 +63,125 @@ const categories = [
   { name: 'All Animals', icon: '🐾' },
 ]
 
+function getSpecies(typeValue: string | null) {
+  const type = (typeValue || '').toLowerCase()
+
+  if (type.includes('dog')) return 'Dogs'
+  if (type.includes('cat')) return 'Cats'
+  if (type.includes('bird')) return 'Birds'
+  return 'Small Animals'
+}
+
+function getAgeMonths(
+  ageText: string | null,
+  ageYears: number | null
+) {
+  const age = ageText || ''
+
+  const years = age.match(/(\d+)\s*years?/i)
+  const months = age.match(/(\d+)\s*months?/i)
+  const weeks = age.match(/(\d+)\s*weeks?/i)
+
+  if (years || months || weeks) {
+    return (
+      (years ? Number(years[1]) * 12 : 0) +
+      (months ? Number(months[1]) : 0) +
+      (weeks ? Number(weeks[1]) / 4.345 : 0)
+    )
+  }
+
+  if (typeof ageYears === 'number' && ageYears >= 0) {
+    return ageYears * 12
+  }
+
+  return -1
+}
+
+function convertAnimal(animal: ShelterAnimal): Pet {
+  const sizeValue = (animal.PETSIZE || '').toLowerCase()
+
+  const size =
+    sizeValue.includes('small') ? 'Small' :
+    sizeValue.includes('medium') ? 'Medium' :
+    sizeValue.includes('large') ? 'Large' :
+    animal.PETSIZE || 'Unknown'
+
+  const sexValue = animal.SEX || 'Unknown'
+  const sexLower = sexValue.toLowerCase()
+
+  const sex =
+    sexLower.startsWith('f') ? `Female${sexValue.length > 1 ? ` (${sexValue})` : ''}` :
+    sexLower.startsWith('m') ? `Male${sexValue.length > 1 ? ` (${sexValue})` : ''}` :
+    sexValue
+
+  const weight =
+    animal.PETWEIGHT === null ||
+    animal.PETWEIGHT === ''
+      ? 'Unknown'
+      : `${animal.PETWEIGHT} lbs`
+
+  return {
+    id: animal.ANIMALID || '',
+    name: animal.PETNAME || 'Unnamed Animal',
+    age: animal.PETAGE || 'Age unknown',
+    ageMonths: getAgeMonths(animal.PETAGE, animal.PETAGEYEARS),
+    sex,
+    breed: animal.BREED || 'Unknown',
+    color: animal.COLOR || 'Unknown',
+    size,
+    weight,
+    kennel: animal.KENNELNAME || 'Not listed',
+    intake: animal.INDATE
+      ? new Date(animal.INDATE).toLocaleDateString()
+      : 'Unknown',
+    status: animal.ANIMALSTATUS || 'Status unknown',
+    species: getSpecies(animal.ANIMALTYPE),
+    image: animal.PHOTOLINK || '',
+    profileUrl: animal.WEBLINK || '',
+    rescueStatus: animal.RESCUESTATUS || '',
+    fosterStatus: animal.FOSTERSTATUS || '',
+  }
+}
+
+function PetPhoto({
+  image,
+  name,
+}: {
+  image: string
+  name: string
+}) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [image])
+
+  if (!image || failed) {
+    return (
+      <div className="photo-placeholder">
+        🐾
+        <p>No photo available</p>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={image}
+      alt={name}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 function App() {
+  const [pets, setPets] = useState<Pet[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [refreshCount, setRefreshCount] = useState(0)
+  const [lastUpdated, setLastUpdated] = useState('')
+
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All Animals')
   const [size, setSize] = useState('All Sizes')
@@ -142,6 +194,7 @@ function App() {
     try {
       const saved = localStorage.getItem('pet-favorites')
       const parsed: unknown = saved ? JSON.parse(saved) : []
+
       return Array.isArray(parsed)
         ? parsed.filter((id): id is string => typeof id === 'string')
         : []
@@ -155,22 +208,90 @@ function App() {
   }, [favorites])
 
   useEffect(() => {
-  const url =
-    'https://geo.sanjoseca.gov/server/rest/services/DPW/DPW_AnimalCareServices/MapServer/1/query'
+    const controller = new AbortController()
 
-  const params = new URLSearchParams({
-    where: "ANIMALSTATUS='Available'",
-    outFields: 'ANIMALID,PETNAME,ANIMALTYPE,PHOTOLINK',
-    returnGeometry: 'false',
-    resultRecordCount: '3',
-    f: 'json',
-  })
+    async function loadAnimals() {
+      setLoading(true)
+      setError('')
 
-  fetch(`${url}?${params}`)
-    .then((response) => response.json())
-    .then((data) => console.log('Shelter animals:', data.features))
-    .catch((error) => console.error('Shelter API error:', error))
-}, [])
+      try {
+        const allAnimals: Pet[] = []
+        const pageSize = 1000
+        let offset = 0
+
+        while (true) {
+          const params = new URLSearchParams({
+            where: '1=1',
+            outFields:
+              'ANIMALID,PETNAME,ANIMALTYPE,ANIMALSUBTYPE,SEX,PETAGE,PETAGEYEARS,PETSIZE,PETWEIGHT,COLOR,BREED,KENNELNAME,INDATE,ANIMALSTATUS,RESCUESTATUS,FOSTERSTATUS,PHOTOLINK,WEBLINK',
+            returnGeometry: 'false',
+            resultOffset: String(offset),
+            resultRecordCount: String(pageSize),
+            orderByFields: 'OBJECTID ASC',
+            f: 'json',
+          })
+
+          const response = await fetch(
+            `${API_URL}?${params}`,
+            { signal: controller.signal }
+          )
+
+          if (!response.ok) {
+            throw new Error('The shelter server did not respond.')
+          }
+
+          const data: ShelterResponse = await response.json()
+
+          if (data.error || !Array.isArray(data.features)) {
+            throw new Error(
+              data.error?.message || 'Invalid shelter data.'
+            )
+          }
+
+          const page = data.features
+
+          allAnimals.push(
+            ...page
+              .map((item) => convertAnimal(item.attributes))
+              .filter((pet) => pet.id !== '')
+          )
+
+          if (
+            page.length === 0 ||
+            (!data.exceededTransferLimit && page.length < pageSize)
+          ) {
+            break
+          }
+
+          offset += page.length
+        }
+
+        const uniquePets = Array.from(
+          new Map(allAnimals.map((pet) => [pet.id, pet])).values()
+        )
+
+        if (!controller.signal.aborted) {
+          setPets(uniquePets)
+          setLastUpdated(new Date().toLocaleString())
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error('Shelter API error:', err)
+          setError(
+            'Unable to load shelter animals. Please try again.'
+          )
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadAnimals()
+
+    return () => controller.abort()
+  }, [refreshCount])
 
   function toggleFavorite(id: string) {
     setFavorites((current) =>
@@ -203,7 +324,7 @@ function App() {
 
   const filteredPets = pets.filter((pet) => {
     const matchesSearch =
-      `${pet.name} ${pet.id} ${pet.breed} ${pet.kennel}`
+      `${pet.name} ${pet.id} ${pet.breed} ${pet.kennel} ${pet.status}`
         .toLowerCase()
         .includes(search.trim().toLowerCase())
 
@@ -218,11 +339,12 @@ function App() {
 
     const matchesAge =
       age === 'All Ages' ||
-      (age === 'Baby' && pet.ageMonths < 6) ||
-      (age === 'Young' &&
-        pet.ageMonths >= 6 &&
-        pet.ageMonths < 24) ||
-      (age === 'Adult' && pet.ageMonths >= 24)
+      (pet.ageMonths >= 0 &&
+        ((age === 'Baby' && pet.ageMonths < 6) ||
+          (age === 'Young' &&
+            pet.ageMonths >= 6 &&
+            pet.ageMonths < 24) ||
+          (age === 'Adult' && pet.ageMonths >= 24)))
 
     const matchesFavorite =
       !showFavorites || favorites.includes(pet.id)
@@ -253,7 +375,7 @@ function App() {
         </a>
 
         <nav className="nav-links" aria-label="Main navigation">
-          <a href="#animals">Adopt</a>
+          <a href="#animals">Animals</a>
           <a href={shelterURL} target="_blank" rel="noreferrer">
             Lost & Found
           </a>
@@ -290,7 +412,9 @@ function App() {
       <main>
         <section className="hero">
           <div className="hero-content">
-            <span className="eyebrow">SAN JOSÉ ANIMAL CARE</span>
+            <span className="eyebrow">
+              SAN JOSÉ ANIMAL CARE
+            </span>
 
             <h1>
               Find Your
@@ -308,12 +432,14 @@ function App() {
               }}
             >
               <span aria-hidden="true">⌕</span>
+
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search by name or animal ID..."
                 aria-label="Search by name or animal ID"
               />
+
               <button type="submit">Search</button>
             </form>
 
@@ -322,11 +448,15 @@ function App() {
                 <button
                   key={item.name}
                   className={
-                    category === item.name ? 'category active' : 'category'
+                    category === item.name
+                      ? 'category active'
+                      : 'category'
                   }
                   onClick={() => selectCategory(item.name)}
                 >
-                  <span className="category-icon">{item.icon}</span>
+                  <span className="category-icon">
+                    {item.icon}
+                  </span>
                   <span>{item.name}</span>
                 </button>
               ))}
@@ -342,7 +472,9 @@ function App() {
             />
             <div>
               <h3>Adopt</h3>
-              <p>Give a pet a second chance at a happy life.</p>
+              <p>
+                Give a pet a second chance at a happy life.
+              </p>
               <a href="#animals">View Animals →</a>
             </div>
           </article>
@@ -354,8 +486,14 @@ function App() {
             />
             <div>
               <h3>Foster</h3>
-              <p>Provide a temporary home and save lives.</p>
-              <a href={shelterURL} target="_blank" rel="noreferrer">
+              <p>
+                Provide a temporary home and save lives.
+              </p>
+              <a
+                href={shelterURL}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Learn More →
               </a>
             </div>
@@ -368,8 +506,14 @@ function App() {
             />
             <div>
               <h3>Volunteer</h3>
-              <p>Make a difference in your community.</p>
-              <a href={shelterURL} target="_blank" rel="noreferrer">
+              <p>
+                Make a difference in your community.
+              </p>
+              <a
+                href={shelterURL}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Get Involved →
               </a>
             </div>
@@ -379,12 +523,17 @@ function App() {
         <section className="featured" id="animals">
           <div className="section-heading">
             <div>
-              <h2>Featured Animals</h2>
+              <h2>Animals at the Shelter</h2>
               <p>
-                Explore our shelter listing snapshot and find a companion.
+                Explore current animal listings from San José
+                Animal Care & Services.
               </p>
             </div>
-            <button className="text-button" onClick={clearFilters}>
+
+            <button
+              className="text-button"
+              onClick={clearFilters}
+            >
               View All Animals →
             </button>
           </div>
@@ -394,10 +543,14 @@ function App() {
               Animal Type
               <select
                 value={category}
-                onChange={(event) => setCategory(event.target.value)}
+                onChange={(event) =>
+                  setCategory(event.target.value)
+                }
               >
                 {categories.map((item) => (
-                  <option key={item.name}>{item.name}</option>
+                  <option key={item.name}>
+                    {item.name}
+                  </option>
                 ))}
               </select>
             </label>
@@ -406,7 +559,9 @@ function App() {
               Age
               <select
                 value={age}
-                onChange={(event) => setAge(event.target.value)}
+                onChange={(event) =>
+                  setAge(event.target.value)
+                }
               >
                 <option>All Ages</option>
                 <option>Baby</option>
@@ -419,7 +574,9 @@ function App() {
               Size
               <select
                 value={size}
-                onChange={(event) => setSize(event.target.value)}
+                onChange={(event) =>
+                  setSize(event.target.value)
+                }
               >
                 <option>All Sizes</option>
                 <option>Small</option>
@@ -432,7 +589,9 @@ function App() {
               Sex
               <select
                 value={sex}
-                onChange={(event) => setSex(event.target.value)}
+                onChange={(event) =>
+                  setSex(event.target.value)
+                }
               >
                 <option>All Sexes</option>
                 <option>Female</option>
@@ -440,72 +599,131 @@ function App() {
               </select>
             </label>
 
-            <button className="clear-button" onClick={clearFilters}>
+            <button
+              className="clear-button"
+              onClick={clearFilters}
+            >
               Clear Filters
             </button>
           </div>
 
-          <p className="results-count">
-            {filteredPets.length} animals found
-            {showFavorites ? ' · Favorites only' : ''}
-          </p>
+          {loading && (
+            <p role="status">
+              Loading live shelter animals...
+            </p>
+          )}
 
-          <div className="pet-grid">
-            {filteredPets.map((pet) => (
-              <article className="pet-card" key={pet.id}>
-                <div className="pet-image">
-                  <img src={pet.image} alt={pet.name} />
-                  <span className="status">Available*</span>
-
-                  <button
-                    className="heart"
-                    aria-label={
-                      favorites.includes(pet.id)
-                        ? `Remove ${pet.name} from favorites`
-                        : `Add ${pet.name} to favorites`
-                    }
-                    aria-pressed={favorites.includes(pet.id)}
-                    onClick={() => toggleFavorite(pet.id)}
-                  >
-                    {favorites.includes(pet.id) ? '♥' : '♡'}
-                  </button>
-                </div>
-
-                <div className="pet-information">
-                  <h3>{pet.name}</h3>
-                  <p className="pet-id">ID: {pet.id}</p>
-
-                  <div className="pet-facts">
-                    <p>♧ {pet.sex}</p>
-                    <p>▣ {pet.age}</p>
-                    <p>♧ {pet.breed}</p>
-                    <p>◈ {pet.color}</p>
-                    <p>♧ {pet.size} ({pet.weight})</p>
-                  </div>
-
-                  <button
-                    className="pet-button"
-                    onClick={() => setSelectedPet(pet)}
-                  >
-                    Meet {pet.name}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          {filteredPets.length === 0 && (
-            <div className="empty-results">
-              <h3>No animals found</h3>
-              <p>Try changing your filters or search.</p>
-              <button onClick={clearFilters}>Clear Filters</button>
+          {error && (
+            <div className="empty-results" role="alert">
+              <p>{error}</p>
+              <button
+                onClick={() =>
+                  setRefreshCount((count) => count + 1)
+                }
+              >
+                Try Again
+              </button>
             </div>
           )}
 
+          {!loading && !error && (
+            <>
+              <p className="results-count">
+                {filteredPets.length} animals found
+                {showFavorites ? ' · Favorites only' : ''}
+              </p>
+
+              {lastUpdated && (
+                <p className="sample-note">
+                  Data retrieved: {lastUpdated}
+                  {' · '}
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      setRefreshCount((count) => count + 1)
+                    }
+                  >
+                    Refresh Animals
+                  </button>
+                </p>
+              )}
+
+              <div className="pet-grid">
+                {filteredPets.map((pet) => (
+                  <article className="pet-card" key={pet.id}>
+                    <div className="pet-image">
+                      <PetPhoto
+                        image={pet.image}
+                        name={pet.name}
+                      />
+
+                      <span className="status">
+                        {pet.status}
+                      </span>
+
+                      <button
+                        className="heart"
+                        aria-label={
+                          favorites.includes(pet.id)
+                            ? `Remove ${pet.name} from favorites`
+                            : `Add ${pet.name} to favorites`
+                        }
+                        aria-pressed={favorites.includes(pet.id)}
+                        onClick={() => toggleFavorite(pet.id)}
+                      >
+                        {favorites.includes(pet.id)
+                          ? '♥'
+                          : '♡'}
+                      </button>
+                    </div>
+
+                    <div className="pet-information">
+                      <h3>{pet.name}</h3>
+                      <p className="pet-id">
+                        ID: {pet.id}
+                      </p>
+
+                      <div className="pet-facts">
+                        <p>♧ {pet.sex}</p>
+                        <p>▣ {pet.age}</p>
+                        <p>♧ {pet.breed}</p>
+                        <p>◈ {pet.color}</p>
+                        <p>
+                          ♧ {pet.size} ({pet.weight})
+                        </p>
+                      </div>
+
+                      <button
+                        className="pet-button"
+                        onClick={() => setSelectedPet(pet)}
+                      >
+                        Meet {pet.name}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              {filteredPets.length === 0 && (
+                <div className="empty-results">
+                  <h3>No animals found</h3>
+                  <p>
+                    Try changing your filters or search.
+                  </p>
+                  <button onClick={clearFilters}>
+                    Clear Filters
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
           <p className="sample-note">
-            *Historical shelter listing snapshot. Availability, ages,
-            and kennel assignments may have changed. Confirm details
-            with San José Animal Care & Services.
+            Animal information comes from San José Animal
+            Care & Services. Shelter statuses and listings
+            may change. An animal listed as available is not
+            necessarily eligible for immediate adoption.
+            Always confirm details with the official shelter.
           </p>
         </section>
 
@@ -514,14 +732,17 @@ function App() {
             src="/images/mission.jpg"
             alt="Animal care volunteer holding a cat"
           />
+
           <div className="mission-content">
             <h2>Our Mission</h2>
             <p>
-              The City of San José Animal Care & Services protects
-              and enhances the quality of life for animals and
-              people in our community through compassionate care,
-              education, and sheltering services.
+              The City of San José Animal Care & Services
+              protects and enhances the quality of life for
+              animals and people in our community through
+              compassionate care, education, and sheltering
+              services.
             </p>
+
             <a
               className="donate-button"
               href={shelterURL}
@@ -562,39 +783,75 @@ function App() {
               ×
             </button>
 
-            <img
-              src={selectedPet.image}
-              alt={selectedPet.name}
+            <PetPhoto
+              image={selectedPet.image}
+              name={selectedPet.name}
             />
 
             <div className="modal-content">
               <h2>{selectedPet.name}</h2>
-              <p className="pet-id">ID: {selectedPet.id}</p>
+              <p className="pet-id">
+                ID: {selectedPet.id}
+              </p>
 
               <div className="modal-facts">
-                <p><strong>Age:</strong> {selectedPet.age}</p>
-                <p><strong>Sex:</strong> {selectedPet.sex}</p>
-                <p><strong>Breed:</strong> {selectedPet.breed}</p>
-                <p><strong>Color:</strong> {selectedPet.color}</p>
-                <p><strong>Size:</strong> {selectedPet.size}</p>
-                <p><strong>Weight:</strong> {selectedPet.weight}</p>
-                <p><strong>Ken​​nel:</strong> {selectedPet.kennel}</p>
-                <p><strong>Intake:</strong> {selectedPet.intake}</p>
-                <p><strong>Snapshot status:</strong> {selectedPet.status}</p>
+                <p>
+                  <strong>Age:</strong> {selectedPet.age}
+                </p>
+                <p>
+                  <strong>Sex:</strong> {selectedPet.sex}
+                </p>
+                <p>
+                  <strong>Breed:</strong> {selectedPet.breed}
+                </p>
+                <p>
+                  <strong>Color:</strong> {selectedPet.color}
+                </p>
+                <p>
+                  <strong>Size:</strong> {selectedPet.size}
+                </p>
+                <p>
+                  <strong>Weight:</strong> {selectedPet.weight}
+                </p>
+                <p>
+                  <strong>Kennel:</strong> {selectedPet.kennel}
+                </p>
+                <p>
+                  <strong>Intake:</strong> {selectedPet.intake}
+                </p>
+                <p>
+                  <strong>Shelter status:</strong>{' '}
+                  {selectedPet.status}
+                </p>
+
+                {selectedPet.rescueStatus && (
+                  <p>
+                    <strong>Rescue:</strong>{' '}
+                    {selectedPet.rescueStatus}
+                  </p>
+                )}
+
+                {selectedPet.fosterStatus && (
+                  <p>
+                    <strong>Foster:</strong>{' '}
+                    {selectedPet.fosterStatus}
+                  </p>
+                )}
               </div>
 
               <p className="modal-note">
-                Please verify this animal's current availability
-                with the shelter before visiting.
+                Please verify this animal's current status
+                and adoption or rescue eligibility with
+                the shelter before visiting.
               </p>
 
               <a
                 className="pet-button"
-                href={shelterURL}
+                href={selectedPet.profileUrl || shelterURL}
                 target="_blank"
                 rel="noreferrer"
               >
-                Contact the Shelter
+                View Official Animal Profile
               </a>
             </div>
           </section>
